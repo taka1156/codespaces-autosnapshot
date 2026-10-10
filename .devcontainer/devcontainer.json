@@ -1,9 +1,6 @@
 {
   "name": "codespaces-autosnapshot",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
-  "containerEnv": {
-    "AUTOSAVE_INTERVAL": "300",
-    "AUTOSAVE_EXCLUDE_FILE": ".devcontainer/autosave.ignore"
-  },
-  "postStartCommand": "nohup bash .devcontainer/autosave.sh \"$PWD\" >/tmp/autosave.log 2>&1 &"
+  "postStartCommand": "nohup bash .devcontainer/autosave.sh \"$PWD\" >/tmp/autosave.log 2>&1 &",
+  "postAttachCommand": "bash .devcontainer/autosave-notify/install.sh"
 }
