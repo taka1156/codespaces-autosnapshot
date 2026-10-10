@@ -1,0 +1,40 @@
+{
+  "name": "autosave-notify",
+  "displayName": "Autosave Notify",
+  "description": "Shows pop-up notifications for the autosave.sh backups (success, unbacked-up changes, push failure).",
+  "version": "0.1.0",
+  "publisher": "local",
+  "license": "MIT",
+  "engines": { "vscode": "^1.74.0" },
+  "extensionKind": ["workspace"],
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Autosave Notify",
+      "properties": {
+        "autosaveNotify.statusFile": {
+          "type": "string",
+          "default": "/tmp/autosave.status",
+          "description": "Status file written by autosave.sh (AUTOSAVE_STATUS_FILE)."
+        },
+        "autosaveNotify.showSuccess": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a notification every time a backup succeeds."
+        },
+        "autosaveNotify.showPending": {
+          "type": "boolean",
+          "default": true,
+          "description": "Warn when changes stay unbacked up for too long."
+        },
+        "autosaveNotify.showFailure": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show an error when a backup push fails."
+        }
+      }
+    }
+  }
+}

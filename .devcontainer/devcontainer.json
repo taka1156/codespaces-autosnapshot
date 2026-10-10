@@ -1,0 +1,6 @@
+{
+  "name": "codespaces-autosnapshot",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "postStartCommand": "nohup bash .devcontainer/autosave.sh \"$PWD\" >/tmp/autosave.log 2>&1 &",
+  "postAttachCommand": "bash .devcontainer/autosave-notify/install.sh"
+}

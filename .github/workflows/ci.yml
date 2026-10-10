@@ -1,0 +1,115 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint
+        run: >-
+          shellcheck
+          .devcontainer/autosave.sh
+          .devcontainer/autosave-notify/install.sh
+          scripts/build-vsix.sh
+          test/autosave.test.sh
+          test/install.test.sh
+
+      - name: Test (autosave.sh)
+        run: bash test/autosave.test.sh
+
+      - name: Test (VS Code extension logic)
+        run: node test/notify-extension.test.js
+
+      - name: Test (vsix build and install.sh)
+        run: bash test/install.test.sh
+
+  # Attach the notification extension (.vsix) to the GitHub Release.
+  # The template's install.sh downloads and installs the latest .vsix published here.
+  publish-extension:
+    needs: test
+    if: github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the .vsix
+        run: bash scripts/build-vsix.sh autosave-notify.vsix
+
+      - name: Publish to the rolling release
+        run: |
+          set -euo pipefail
+          if ! gh release view notify-latest >/dev/null 2>&1; then
+            gh release create notify-latest \
+              --title "Autosave Notify (latest)" \
+              --notes "Latest build of the VS Code extension. Installed by .devcontainer/autosave-notify/install.sh." \
+              --target "$GITHUB_SHA"
+          fi
+          gh release upload notify-latest autosave-notify.vsix --clobber
+
+  publish-template:
+    needs: test
+    if: github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      # List of template files to be included in the template branch.
+      TEMPLATE_FILES: |
+        .devcontainer/autosave.sh
+        .devcontainer/autosave.ignore
+        .devcontainer/devcontainer.json
+        .devcontainer/autosave-notify/install.sh
+        README.md
+        README.ja.md
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect template files
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/out && mkdir -p /tmp/out
+          while read -r f; do
+            [ -z "$f" ] && continue
+            if [ ! -e "$f" ]; then echo "::error::missing template file: $f"; exit 1; fi
+            cp --parents "$f" /tmp/out/
+          done <<< "$TEMPLATE_FILES"
+          find /tmp/out -type f | sort
+
+      - name: Update template branch
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code --heads origin template >/dev/null 2>&1; then
+            git fetch origin template
+            git checkout -q -B template origin/template
+          else
+            git checkout -q --orphan template
+          fi
+
+          git rm -rf -q . 2>/dev/null || true
+          git clean -fdxq
+          cp -a /tmp/out/. .
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to the template."
+            exit 0
+          fi
+
+          git commit -q -m "template: sync from ${GITHUB_SHA::7}"
+          git push origin template
